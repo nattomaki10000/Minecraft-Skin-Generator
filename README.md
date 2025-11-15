@@ -1,1 +1,1 @@
-# Minecraft-Education-Skin-Generator
+# Minecraft-Skin-Generator
