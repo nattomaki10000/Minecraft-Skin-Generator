@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Minecraft Bedrock Skin Pack Generator (JP/EN)</title>
+
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
+<style>
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans JP",sans-serif;margin:0;padding:24px;background:#f7f7fb;color:#111}
+  h1{margin:0 0 12px;font-size:20px}
+  .panel{background:#fff;padding:16px;border-radius:10px;box-shadow:0 6px 18px rgba(15,18,40,0.06);max-width:1000px;margin-bottom:16px}
+  label{display:block;margin:8px 0 4px;font-weight:600}
+  input[type="text"], input[type="file"], select{width:100%;padding:8px;border:1px solid #ddd;border-radius:6px}
+  .skins-list{margin-top:12px}
+  .skin-item{display:flex;gap:8px;align-items:center;border:1px dashed #eee;padding:8px;border-radius:6px;margin-bottom:8px}
+  .skin-thumb{width:64px;height:64px;border-radius:6px;object-fit:contain;background:#fafafa;border:1px solid #eee}
+  .skin-fields{flex:1}
+  .row{display:flex;gap:8px}
+  .row > *{flex:1}
+  button{padding:10px 14px;border-radius:8px;border:0;background:#2563eb;color:white;font-weight:600;cursor:pointer}
+  button.secondary{background:#e6e9f2;color:#111}
+  .hint{font-size:13px;color:#666;margin-top:6px}
+</style>
+</head>
+<body>
+  <div class="panel">
+    <h1>Minecraft Bedrock Skin Pack Generator<br>(English + Japanese Localization)</h1>
+
+    <label>スキンパック名（英語 / 必須）</label>
+    <input id="packNameEn" type="text" placeholder="Example: My Skin Pack">
+
+    <label>スキンパック名（日本語 / 任意）</label>
+    <input id="packNameJp" type="text" placeholder="例: マイスキンパック">
+
+    <label>パックのローカライズ用キー（半角英数字・_）</label>
+    <input id="packLocalizationKey" type="text" value="mypack">
+
+    <div style="margin-top:12px;display:flex;gap:8px;">
+      <button id="addSkinBtn" class="secondary">スキンを追加</button>
+      <button id="exportBtn">Export .mcpack</button>
+    </div>
+
+    <div class="skins-list" id="skinsList"></div>
+  </div>
+
+<script>
+function uuidv4(){
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = crypto.getRandomValues(new Uint8Array(1))[0] & 15;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+function sanitizeKey(s){
+  return String(s||'').replace(/[^A-Za-z0-9_]/g,'_').replace(/^_+|_+$/g,'').toLowerCase()||'key';
+}
+
+const skinsList = document.getElementById('skinsList');
+const addSkinBtn = document.getElementById('addSkinBtn');
+const exportBtn = document.getElementById('exportBtn');
+
+let skinIndex = 0;
+function addSkinItem(){
+  skinIndex++;
+  const id = "skin_" + skinIndex;
+
+  const div = document.createElement("div");
+  div.className = "skin-item";
+  div.dataset.id = id;
+
+  div.innerHTML = `
+    <img class="skin-thumb" src="" />
+    <div class="skin-fields">
+      <div class="row">
+        <input type="file" accept="image/png" class="skin-file" />
+        <select class="arm-choice">
+          <option value="normal">普通(通常腕)</option>
+          <option value="slim">スリム(細腕)</option>
+        </select>
+      </div>
+
+      <div class="row" style="margin-top:8px;">
+        <input type="text" class="skinNameEn" placeholder="スキン名（英語/必須）">
+        <input type="text" class="skinNameJp" placeholder="スキン名（日本語/任意）">
+      </div>
+    </div>
+
+    <button class="secondary removeBtn">削除</button>
+  `;
+
+  skinsList.appendChild(div);
+
+  const fileInput = div.querySelector(".skin-file");
+  const thumb = div.querySelector(".skin-thumb");
+  fileInput.addEventListener("change", e => {
+    const f = e.target.files[0];
+    if(!f) return;
+    const reader = new FileReader();
+    reader.onload = () => thumb.src = reader.result;
+    reader.readAsDataURL(f);
+  });
+  div.querySelector(".removeBtn").onclick = () => div.remove();
+}
+
+addSkinBtn.onclick = () => addSkinItem();
+addSkinItem(); // 初期1つ追加
+
+exportBtn.onclick = async () => {
+  const packNameEn = document.getElementById("packNameEn").value.trim();
+  const packNameJp = document.getElementById("packNameJp").value.trim();
+  const packKey = sanitizeKey(document.getElementById("packLocalizationKey").value);
+
+  if(!packNameEn){
+    alert("スキンパック名（英語）は必須です。");
+    return;
+  }
+
+  const nodes = [...document.querySelectorAll(".skin-item")];
+  if(nodes.length === 0){
+    alert("スキンを1つ以上追加してください。");
+    return;
+  }
+
+  const skins = [];
+  for(const n of nodes){
+    const file = n.querySelector(".skin-file").files[0];
+    const nameEn = n.querySelector(".skinNameEn").value.trim();
+    const nameJp = n.querySelector(".skinNameJp").value.trim();
+    const arm = n.querySelector(".arm-choice").value;
+
+    if(!file){
+      alert("すべてのスキンに画像を指定してください。");
+      return;
+    }
+    if(!nameEn){
+      alert("すべてのスキン名（英語）は必須です。");
+      return;
+    }
+
+    const buf = await file.arrayBuffer();
+    skins.push({
+      fileName: file.name.replace(/\s+/g, "_"),
+      blob: new Blob([buf], {type:"image/png"}),
+      nameEn,
+      nameJp,
+      key: sanitizeKey(nameEn),
+      arm
+    });
+  }
+
+  // manifest.json
+  const manifest = {
+    format_version: 2,
+    header: {
+      name: packNameEn,
+      uuid: uuidv4(),
+      version: [1,0,0]
+    },
+    modules: [{
+      type: "skin_pack",
+      uuid: uuidv4(),
+      version: [1,0,0]
+    }]
+  };
+
+  // skins.json
+  const skinsJson = {
+    serialize_name: packNameEn,
+    localization_name: packKey,
+    skins: skins.map(s => ({
+      localization_name: s.key,
+      geometry: s.arm === "slim" ? "geometry.humanoid.customSlim" : "geometry.humanoid.custom",
+      texture: s.fileName,
+      type: "free"
+    }))
+  };
+
+  // texts/en_US.lang（英語）
+  let langEn = `skinpack.${packKey}=${packNameEn}\n\n`;
+  skins.forEach(s => {
+    langEn += `skin.${packKey}.${s.key}=${s.nameEn}\n`;
+  });
+
+  // texts/ja_JP.lang（日本語、ない場合は英語 fallback）
+  let langJp = `skinpack.${packKey}=${packNameJp || packNameEn}\n\n`;
+  skins.forEach(s => {
+    langJp += `skin.${packKey}.${s.key}=${s.nameJp || s.nameEn}\n`;
+  });
+
+  const zip = new JSZip();
+  zip.file("manifest.json", JSON.stringify(manifest, null, 2));
+  zip.file("skins.json", JSON.stringify(skinsJson, null, 2));
+
+  zip.folder("texts").file("en_US.lang", langEn);
+  zip.folder("texts").file("ja_JP.lang", langJp);
+
+  skins.forEach(s => zip.file(s.fileName, s.blob));
+
+  const mcpack = await zip.generateAsync({type:"blob"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(mcpack);
+  a.download = `${packNameEn.replace(/[^A-Za-z0-9_-]/g,"_")}.mcpack`;
+  a.click();
+};
+</script>
+
+</body>
+</html>
