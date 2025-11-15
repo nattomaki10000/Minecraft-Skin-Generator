@@ -89,26 +89,30 @@
 <script>
 function uuidv4(){
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{
-    const r=crypto.getRandomValues(new Uint8Array(1))[0]&15;
-    const v=c==='x'?r:(r&3|8);
+    const r=crypto.getRandomValues(new Uint8Array(1))[0] & 15;
+    const v=c==='x'? r : (r & 3 | 8);
     return v.toString(16);
   });
 }
 
-// 乱数でパックキー自動生成
-function generatePackKey(){
-  return "pack_" + Math.floor(100000 + Math.random()*900000);
+// ★ インデックスから "1a,1b,1c…" を生成
+function indexToKey(index){
+  const letters = "abcdefghijklmnopqrstuvwxyz";
+  const number = Math.floor(index / 26) + 1;   // 1,2,3...
+  const letter = letters[index % 26];          // a,b,c...
+  return number + letter;                      // → "1a"
 }
 
-const skinsList=document.getElementById("skinsList");
-document.getElementById("addSkinBtn").onclick=()=>addSkinItem();
+const skinsList = document.getElementById("skinsList");
+document.getElementById("addSkinBtn").onclick = () => addSkinItem();
 
-let skinId=0;
+let skinId = 0;
+
 function addSkinItem(){
   skinId++;
-  const div=document.createElement("div");
-  div.className="skin-item";
-  div.innerHTML=`
+  const div = document.createElement("div");
+  div.className = "skin-item";
+  div.innerHTML = `
     <img class="skin-thumb" src="" />
 
     <div class="skin-fields">
@@ -130,83 +134,91 @@ function addSkinItem(){
   `;
   skinsList.appendChild(div);
 
-  const fileInput=div.querySelector(".skin-file");
-  const thumb=div.querySelector(".skin-thumb");
-  fileInput.onchange=e=>{
-    const f=e.target.files[0];if(!f)return;
-    const r=new FileReader();
-    r.onload=()=>thumb.src=r.result;
+  const fileInput = div.querySelector(".skin-file");
+  const thumb = div.querySelector(".skin-thumb");
+  fileInput.onchange = e => {
+    const f = e.target.files[0];
+    if(!f) return;
+    const r = new FileReader();
+    r.onload = () => thumb.src = r.result;
     r.readAsDataURL(f);
   };
-  div.querySelector(".removeBtn").onclick=()=>div.remove();
+
+  div.querySelector(".removeBtn").onclick = () => div.remove();
 }
 
-addSkinItem(); // 最初の1つ
+addSkinItem(); // 初期1つ追加
 
-document.getElementById("exportBtn").onclick=async()=>{
-  const nameEn=document.getElementById("packNameEn").value.trim();
-  const nameJp=document.getElementById("packNameJp").value.trim();
-  if(!nameEn){alert("英語パック名は必須です");return;}
+document.getElementById("exportBtn").onclick = async () => {
 
-  const packKey=generatePackKey(); // ★自動生成
+  const nameEn = document.getElementById("packNameEn").value.trim();
+  const nameJp = document.getElementById("packNameJp").value.trim();
+  if(!nameEn){ alert("英語パック名は必須です"); return; }
 
-  const nodes=[...document.querySelectorAll(".skin-item")];
-  if(nodes.length===0){alert("スキンを追加してください");return;}
+  const nodes = [...document.querySelectorAll(".skin-item")];
+  if(nodes.length === 0){ alert("スキンを追加してください"); return; }
 
-  const skins=[];
-  for(const n of nodes){
-    const file=n.querySelector(".skin-file").files[0];
-    const en=n.querySelector(".skinNameEn").value.trim();
-    const jp=n.querySelector(".skinNameJp").value.trim();
-    const arm=n.querySelector(".arm-choice").value;
+  const skins = [];
+  for(const [i, n] of nodes.entries()){
 
-    if(!file){alert("画像が指定されていません");return;}
-    if(!en){alert("スキン名（英語）は必須です");return;}
+    const file = n.querySelector(".skin-file").files[0];
+    const en = n.querySelector(".skinNameEn").value.trim();
+    const jp = n.querySelector(".skinNameJp").value.trim();
+    const arm = n.querySelector(".arm-choice").value;
 
-    const buf=await file.arrayBuffer();
+    if(!file){ alert("画像が指定されていません"); return; }
+    if(!en){ alert("スキン名 (英語) は必須です"); return; }
+
+    const buf = await file.arrayBuffer();
+
     skins.push({
-      fileName:file.name.replace(/\s+/g,"_"),
-      blob:new Blob([buf],{type:"image/png"}),
-      en,jp,key:en.toLowerCase().replace(/[^a-z0-9_]/g,"_"),
+      indexKey: indexToKey(i),                 // ★ "1a" "1b" "1c"
+      fileName: file.name.replace(/\s+/g, "_"),
+      blob: new Blob([buf], {type:"image/png"}),
+      en, jp,
       arm
     });
   }
 
-  const manifest={
-    format_version:2,
-    header:{name:nameEn,uuid:uuidv4(),version:[1,0,0]},
-    modules:[{type:"skin_pack",uuid:uuidv4(),version:[1,0,0]}]
+  // manifest は今まで通り
+  const manifest = {
+    format_version: 2,
+    header:{ name:nameEn, uuid:uuidv4(), version:[1,0,0] },
+    modules:[{ type:"skin_pack", uuid:uuidv4(), version:[1,0,0] }]
   };
 
-  const skinsJson={
-    serialize_name:nameEn,
-    localization_name:packKey,
-    skins:skins.map(s=>({
-      localization_name:s.key,
-      geometry:s.arm==="slim"?"geometry.humanoid.customSlim":"geometry.humanoid.custom",
-      texture:s.fileName,
-      type:"free"
+  // skins.json（localization_name に indexKey を使う）
+  const skinsJson = {
+    serialize_name: nameEn,
+    localization_name: "pack",  // パック自体は固定のキーでOK
+    skins: skins.map(s => ({
+      localization_name: s.indexKey,          // ★ ここが "1a" など
+      geometry: s.arm==="slim" ? "geometry.humanoid.customSlim" : "geometry.humanoid.custom",
+      texture: s.fileName,
+      type: "free"
     }))
   };
 
-  let enLang=`skinpack.${packKey}=${nameEn}\n\n`;
-  let jpLang=`skinpack.${packKey}=${nameJp||nameEn}\n\n`;
-  skins.forEach(s=>{
-    enLang+=`skin.${packKey}.${s.key}=${s.en}\n`;
-    jpLang+=`skin.${packKey}.${s.key}=${s.jp||s.en}\n`;
+  let enLang = `skinpack.pack=${nameEn}\n\n`;
+  let jpLang = `skinpack.pack=${nameJp || nameEn}\n\n`;
+
+  skins.forEach(s => {
+    enLang += `skin.pack.${s.indexKey}=${s.en}\n`;
+    jpLang += `skin.pack.${s.indexKey}=${s.jp || s.en}\n`;
   });
 
-  const zip=new JSZip();
-  zip.file("manifest.json",JSON.stringify(manifest,null,2));
-  zip.file("skins.json",JSON.stringify(skinsJson,null,2));
-  zip.folder("texts").file("en_US.lang",enLang);
-  zip.folder("texts").file("ja_JP.lang",jpLang);
-  skins.forEach(s=>zip.file(s.fileName,s.blob));
+  const zip = new JSZip();
+  zip.file("manifest.json", JSON.stringify(manifest,null,2));
+  zip.file("skins.json", JSON.stringify(skinsJson,null,2));
+  zip.folder("texts").file("en_US.lang", enLang);
+  zip.folder("texts").file("ja_JP.lang", jpLang);
 
-  const blob=await zip.generateAsync({type:"blob"});
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);
-  a.download=nameEn.replace(/[^a-zA-Z0-9_-]/g,"_")+".mcpack";
+  skins.forEach(s => zip.file(s.fileName, s.blob));
+
+  const blob = await zip.generateAsync({type:"blob"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = nameEn.replace(/[^a-zA-Z0-9_-]/g,"_") + ".mcpack";
   a.click();
 };
 </script>
