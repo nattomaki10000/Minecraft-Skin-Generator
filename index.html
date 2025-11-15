@@ -215,11 +215,16 @@ document.getElementById("exportBtn").onclick = async () => {
 
   skins.forEach(s => zip.file(s.fileName, s.blob));
 
-  const blob = await zip.generateAsync({type:"blob"});
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = nameEn.replace(/[^a-zA-Z0-9_-]/g,"_") + ".mcpack";
-  a.click();
+const blob = await zip.generateAsync({
+  type: "blob",
+  mimeType: "application/octet-stream"   // ★ これが重要
+});
+
+const a = document.createElement("a");
+a.href = URL.createObjectURL(blob);
+a.download = nameEn.replace(/[^a-zA-Z0-9_-]/g,"_") + ".mcpack";
+a.click();
+
 };
 </script>
 
