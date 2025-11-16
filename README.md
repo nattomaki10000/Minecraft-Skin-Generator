@@ -7,7 +7,7 @@ PC・スマホ（iPhone / Android）どちらでも動作します。
 ## 🔧 使い方
 
 ### 1. ページを開く  
-GitHub Pages https://nattomaki10000.github.io を開きます。
+GitHub Pages https://nattomaki10000.github.io:Minecraft-Skin-Generator を開きます。
 
 ### 2. パック名を入力  
 - **英語名（必須）**
