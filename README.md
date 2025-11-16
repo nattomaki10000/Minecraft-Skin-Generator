@@ -1,4 +1,4 @@
-# 🧱 Minecraft Bedrock Skin Pack Generator by nattomaki10000
+# Minecraft Bedrock Skin Pack Generator by nattomaki10000
 
 このツールは、ブラウザ上で簡単に **Minecraft 統合版のスキンパック（.mcpack）を作成できる**  
 ジェネレーターです。  
@@ -35,12 +35,6 @@ GitHub Pages https://nattomaki10000.github.io を開きます。
 
 ### 9. Minecraft に導入  
 ダウンロードした .mcpack を開くと、Minecraft に自動で追加されます。
-
-## 📁 GitHub Pages への設置方法
-
-1. GitHub で新しいレポジトリを作成  
-2. `index.html` をアップロード  
-3. `Settings → Pages` で GitHub Pages を有効化
 
 ## 📜 ライセンス
 
